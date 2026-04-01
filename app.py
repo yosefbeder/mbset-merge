@@ -64,15 +64,15 @@ def get_display_id(idx, df):
             return str(val)
     return f"Row {idx+1}"
 
-def merge_duplicate_questions(input_file, source_priority):
+def merge_duplicate_questions(input_file, source_priority, output_dir="output"):
     print(f"Processing: {input_file}")
     
     # Setup paths
     base_name = os.path.splitext(os.path.basename(input_file))[0]
-    os.makedirs("output", exist_ok=True)
-    merged_output_file = f"output/{base_name}_merged.xlsx"
-    removed_ids_txt = f"output/{base_name}_removed_ids.txt"
-    merge_report_txt = f"output/{base_name}_merge_report.txt"
+    os.makedirs(output_dir, exist_ok=True)
+    merged_output_file = os.path.join(output_dir, f"{base_name}_merged.xlsx")
+    removed_ids_txt = os.path.join(output_dir, f"{base_name}_removed_ids.txt")
+    merge_report_txt = os.path.join(output_dir, f"{base_name}_merge_report.txt")
 
     df = load_dataset(input_file)
     
@@ -172,6 +172,12 @@ def merge_duplicate_questions(input_file, source_priority):
     if merge_report_data:
         write_report(merge_report_txt, input_file, len(df), total_removed, len(merged_df), merge_report_data)
         print(f"✅ Saved merge report to: {merge_report_txt}")
+
+    return {
+        "merged_excel": merged_output_file,
+        "removed_ids": removed_ids_txt,
+        "merge_report": merge_report_txt
+    }
 
 def write_report(path, source, total, removed, final, details):
     with open(path, 'w') as f:
