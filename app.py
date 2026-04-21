@@ -2,6 +2,7 @@ import pandas as pd
 import argparse
 import sys
 import os
+import re
 
 def load_dataset(input_file):
     """Loads CSV or Excel file into a pandas DataFrame."""
@@ -19,20 +20,26 @@ def load_dataset(input_file):
         sys.exit(1)
 
 def normalize_text(text):
-    """Standardizes text for comparison."""
+    """Standardizes text for comparison by removing punctuation and extra whitespaces."""
     if pd.isna(text):
         return ""
-    return str(text).strip().lower()
+    text = str(text).strip().lower()
+    text = re.sub(r'[^\w\s]', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
 
 def get_normalized_options(row, existing_option_cols):
-    """Returns a sorted tuple of normalized option strings."""
+    """Returns a sorted tuple of normalized option strings (punctuation removed)."""
     opts = []
     for c in existing_option_cols:
         val = row[c]
         if pd.isna(val):
             opts.append("")
         else:
-            opts.append(str(val).strip().lower())
+            val_str = str(val).strip().lower()
+            val_str = re.sub(r'[^\w\s]', '', val_str)
+            val_str = re.sub(r'\s+', ' ', val_str).strip()
+            opts.append(val_str)
     return tuple(sorted(opts))
 
 def get_tag_priority_score(tag_string, source_priority):
@@ -102,8 +109,6 @@ def merge_duplicate_questions(input_file, source_priority, output_dir="output"):
             continue
             
         group_indices = group.index.tolist()
-        anchor_idx = group_indices[0] # Original row we keep
-        indices_to_keep.append(anchor_idx)
         
         # 1. Determine the "Winner" (for Tag/Year extraction)
         group_eval = group.copy()
@@ -117,6 +122,9 @@ def merge_duplicate_questions(input_file, source_priority, output_dir="output"):
             
         sort_evaled = group_eval.sort_values(by=sort_cols, ascending=sort_orders, na_position='last')
         winner_idx = sort_evaled.index[0]
+        
+        anchor_idx = winner_idx # Original row we keep
+        indices_to_keep.append(anchor_idx)
         
         # 2. Collect Merged Data
         merged_tags = get_merged_tags(group)
