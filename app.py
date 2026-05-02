@@ -97,12 +97,18 @@ def merge_duplicate_questions(input_file, source_priority, output_dir="output"):
     df['_norm_opts'] = df.apply(lambda r: get_normalized_options(r, existing_option_cols), axis=1)
     df['_norm_text'] = df['Text'].apply(normalize_text)
     
+    group_keys = ['_norm_text', '_norm_opts']
+    if 'Image' in df.columns:
+        group_keys.append('Image')
+    if 'explanationImage' in df.columns:
+        group_keys.append('explanationImage')
+    
     indices_to_keep = []
     ids_to_remove = []
     merge_report_data = []
 
     # Group and Process
-    grouped = df.groupby(['_norm_text', '_norm_opts'], dropna=False)
+    grouped = df.groupby(group_keys, dropna=False)
     
     for _, group in grouped:
         if len(group) <= 1:
