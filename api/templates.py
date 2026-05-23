@@ -979,6 +979,14 @@ REVIEW_TEMPLATE = """<!DOCTYPE html>
   }
 
   renderConflict(0);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') {
+      navigate(-1);
+    } else if (e.key === 'ArrowRight') {
+      navigate(1);
+    }
+  });
 </script>
 </body>
 </html>"""
