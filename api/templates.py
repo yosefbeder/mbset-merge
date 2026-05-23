@@ -278,6 +278,46 @@ UPLOAD_TEMPLATE = """<!DOCTYPE html>
     .field { margin-bottom: 20px; }
     .field label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-bottom: 7px; letter-spacing: 0.02em; text-transform: uppercase; }
 
+    .tags-container {
+      display: none;
+      margin-top: 20px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .tags-title {
+      font-size: 0.85rem; font-weight: 600; color: var(--text); margin-bottom: 8px;
+    }
+    .tags-subtitle {
+      font-size: 0.75rem; color: var(--muted); margin-bottom: 12px;
+    }
+    .tag-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 200px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .tag-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: grab;
+      user-select: none;
+    }
+    .tag-item:active { cursor: grabbing; }
+    .tag-item.dragging { opacity: 0.5; background: var(--primary-dim); }
+    .tag-checkbox { width: 16px; height: 16px; cursor: pointer; }
+    .tag-name { font-size: 0.85rem; color: var(--text); flex: 1; }
+    .tag-drag-handle { color: var(--muted); cursor: grab; }
+
     .submit-btn { width: 100%; font-size: 1rem; padding: 14px; border-radius: 13px; margin-top: 4px; }
 
     .overlay {
@@ -373,10 +413,12 @@ UPLOAD_TEMPLATE = """<!DOCTYPE html>
         Large file &mdash; processing may take a minute or two.
       </div>
 
-      <div class="field" style="margin-top:20px;">
-        <label for="priority">Tag Priority (highest → lowest, comma-separated)</label>
-        <input type="text" id="priority" name="priority" value="Exams, Department, Guyton"
-               placeholder="e.g. Exams, Department, Guyton">
+      <input type="hidden" id="priority" name="priority" value="">
+      
+      <div class="tags-container" id="tags-container">
+        <div class="tags-title">Configure Sources</div>
+        <div class="tags-subtitle">Check the tags that represent sources, and drag to sort them by priority (highest priority at the top).</div>
+        <ul class="tag-list" id="tag-list"></ul>
       </div>
 
       <button type="submit" class="btn btn-primary submit-btn" id="submit-btn">
@@ -411,6 +453,81 @@ UPLOAD_TEMPLATE = """<!DOCTYPE html>
     fileName.textContent = file.name;
     fileInfo.style.display = 'flex';
     sizeWarn.style.display = file.size > LARGE ? 'flex' : 'none';
+    
+    const fd = new FormData();
+    fd.append('file', file);
+    
+    document.getElementById('tags-container').style.display = 'none';
+    
+    fetch('/extract_tags', { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(data => {
+        if (data.tags && data.tags.length > 0) {
+          renderTags(data.tags);
+        }
+      })
+      .catch(err => console.error(err));
+  }
+
+  function renderTags(tags) {
+    const container = document.getElementById('tags-container');
+    const list = document.getElementById('tag-list');
+    list.innerHTML = '';
+    
+    tags.forEach(tag => {
+      const li = document.createElement('li');
+      li.className = 'tag-item';
+      li.draggable = true;
+      
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'tag-checkbox';
+      cb.value = tag;
+      
+      const span = document.createElement('span');
+      span.className = 'tag-name';
+      span.textContent = tag;
+      
+      const handle = document.createElement('span');
+      handle.className = 'tag-drag-handle';
+      handle.innerHTML = '☰';
+      
+      li.appendChild(cb);
+      li.appendChild(span);
+      li.appendChild(handle);
+      
+      li.addEventListener('dragstart', () => li.classList.add('dragging'));
+      li.addEventListener('dragend', () => li.classList.remove('dragging'));
+      
+      list.appendChild(li);
+    });
+    
+    list.addEventListener('dragover', e => {
+      e.preventDefault();
+      const afterElement = getDragAfterElement(list, e.clientY);
+      const dragging = document.querySelector('.dragging');
+      if (afterElement == null) {
+        list.appendChild(dragging);
+      } else {
+        list.insertBefore(dragging, afterElement);
+      }
+    });
+    
+    container.style.display = 'block';
+  }
+  
+  function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.tag-item:not(.dragging)')];
+    
+    return draggableElements.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
   }
 
   fileInput.addEventListener('change', () => onFile(fileInput.files[0]));
@@ -430,6 +547,15 @@ UPLOAD_TEMPLATE = """<!DOCTYPE html>
   });
 
   form.addEventListener('submit', () => {
+    const checked = [];
+    document.querySelectorAll('.tag-item').forEach(li => {
+      const cb = li.querySelector('.tag-checkbox');
+      if (cb && cb.checked) {
+        checked.push(cb.value);
+      }
+    });
+    document.getElementById('priority').value = checked.join(',');
+
     const file = fileInput.files[0];
     if (file && file.size > LARGE) {
       overlaySub.textContent = 'Large file detected — this may take 1–2 minutes.';

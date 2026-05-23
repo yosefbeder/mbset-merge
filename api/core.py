@@ -59,14 +59,19 @@ def tag_prio(tag, pmap):
     return min((p for src, p in pmap.items() if src in s), default=999)
 
 
-def merge_tags(tag_strings):
-    """Merge comma-separated tag strings into a sorted unique set."""
+def merge_tags(tag_strings, pmap):
+    """Merge comma-separated tag strings into a sorted unique set.
+    Sorts sources first according to priority map, then alphabetical."""
     tags = set()
     for t in tag_strings:
         s = sv(t)
         if s:
             tags.update(x.strip() for x in s.split(',') if x.strip())
-    return ', '.join(sorted(tags))
+            
+    def sort_key(tag):
+        return (pmap.get(tag, 999), tag.lower())
+        
+    return ', '.join(sorted(tags, key=sort_key))
 
 
 def _row_data(df, idx, opt_cols, has):
@@ -201,7 +206,7 @@ def analyze(file_bytes, filename, pmap):
             auto_groups.append({
                 'winner_idx':  winner,
                 'all_idxs':    [int(i) for i in idxs],
-                'merged_tags': merge_tags(tvs),
+                'merged_tags': merge_tags(tvs, pmap),
                 'best_year':   by,
             })
 
@@ -210,7 +215,7 @@ def analyze(file_bytes, filename, pmap):
 
 # ─── Apply Decisions ──────────────────────────────────────────────────────────
 
-def apply_decisions(df, auto_groups, review_decisions):
+def apply_decisions(df, auto_groups, review_decisions, pmap):
     """
     Apply auto-merge and manual review decisions to the DataFrame.
 
@@ -237,7 +242,7 @@ def apply_decisions(df, auto_groups, review_decisions):
     for dec in review_decisions:
         w, ai = dec['winner_idx'], dec['all_idxs']
         tvs = [sv(df.iloc[i].get('Tag', '')) for i in ai] if has['Tag'] else []
-        mt = merge_tags(tvs)
+        mt = merge_tags(tvs, pmap)
         by = None
         if has['Year']:
             for idx in ai:

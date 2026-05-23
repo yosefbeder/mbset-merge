@@ -18,6 +18,35 @@ def index():
     return render_template_string(UPLOAD_TEMPLATE)
 
 
+@app.route('/extract_tags', methods=['POST'])
+def extract_tags():
+    if 'file' not in request.files:
+        return {'error': 'No file uploaded.'}, 400
+    f = request.files['file']
+    if not f.filename:
+        return {'error': 'No file selected.'}, 400
+
+    file_bytes = f.read()
+    try:
+        df = load_df(file_bytes, f.filename)
+    except Exception as e:
+        return {'error': str(e)}, 400
+    
+    if 'Tag' not in df.columns:
+        return {'tags': []}
+        
+    from collections import Counter
+    tag_counts = Counter()
+    for t in df['Tag'].dropna().astype(str):
+        for part in t.split(','):
+            p = part.strip()
+            if p:
+                tag_counts[p] += 1
+                
+    sorted_tags = sorted(tag_counts.keys(), key=lambda k: (-tag_counts[k], k))
+    return {'tags': sorted_tags}
+
+
 @app.route('/process', methods=['POST'])
 def process():
     if 'file' not in request.files:
@@ -40,7 +69,7 @@ def process():
 
     # No conflicts — auto-merge everything and show results
     if not conflict_groups:
-        final_df, rem_ids, rich_report = apply_decisions(df, auto_groups, [])
+        final_df, rem_ids, rich_report = apply_decisions(df, auto_groups, [], pmap)
         z64, rem_str = build_output(orig_len, final_df, rem_ids)
         return render_template_string(
             RESULTS_TEMPLATE,
@@ -74,6 +103,10 @@ def finalize():
     filename = request.form.get('filename', 'file.xlsx')
     ag_b64   = request.form.get('auto_groups_b64', '')
     cg_b64   = request.form.get('conflict_groups_b64', '')
+    
+    priority_str = request.form.get('priority', '')
+    plist = [p.strip() for p in priority_str.split(',') if p.strip()]
+    pmap  = {src: rank for rank, src in enumerate(plist, 1)}
 
     file_bytes      = base64.b64decode(file_b64)
     auto_groups     = json.loads(base64.b64decode(ag_b64))
@@ -98,7 +131,7 @@ def finalize():
             except (ValueError, KeyError):
                 pass
 
-    final_df, rem_ids, rich_report = apply_decisions(df, auto_groups, review_decisions)
+    final_df, rem_ids, rich_report = apply_decisions(df, auto_groups, review_decisions, pmap)
     z64, rem_str = build_output(orig_len, final_df, rem_ids)
 
     return render_template_string(
