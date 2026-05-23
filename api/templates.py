@@ -421,7 +421,7 @@ UPLOAD_TEMPLATE = """<!DOCTYPE html>
         <ul class="tag-list" id="tag-list"></ul>
       </div>
 
-      <button type="submit" class="btn btn-primary submit-btn" id="submit-btn">
+      <button type="submit" class="btn btn-primary submit-btn" id="submit-btn" disabled>
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
         </svg>
@@ -448,6 +448,23 @@ UPLOAD_TEMPLATE = """<!DOCTYPE html>
   const form       = document.getElementById('upload-form');
   const LARGE      = 300 * 1024; // 300 KB
 
+  function validateSources() {
+    const checkboxes = document.querySelectorAll('.tag-checkbox');
+    const submitBtn = document.getElementById('submit-btn');
+    if (checkboxes.length === 0) {
+      submitBtn.disabled = false;
+      return;
+    }
+    let anyChecked = false;
+    for (let i = 0; i < checkboxes.length; i++) {
+      if (checkboxes[i].checked) {
+        anyChecked = true;
+        break;
+      }
+    }
+    submitBtn.disabled = !anyChecked;
+  }
+
   function onFile(file) {
     if (!file) return;
     fileName.textContent = file.name;
@@ -458,15 +475,22 @@ UPLOAD_TEMPLATE = """<!DOCTYPE html>
     fd.append('file', file);
     
     document.getElementById('tags-container').style.display = 'none';
+    document.getElementById('submit-btn').disabled = true;
     
     fetch('/extract_tags', { method: 'POST', body: fd })
       .then(r => r.json())
       .then(data => {
         if (data.tags && data.tags.length > 0) {
           renderTags(data.tags);
+        } else {
+          document.getElementById('tag-list').innerHTML = '';
+          validateSources();
         }
       })
-      .catch(err => console.error(err));
+      .catch(err => {
+        console.error(err);
+        validateSources();
+      });
   }
 
   function renderTags(tags) {
@@ -492,6 +516,8 @@ UPLOAD_TEMPLATE = """<!DOCTYPE html>
       handle.className = 'tag-drag-handle';
       handle.innerHTML = '☰';
       
+      cb.addEventListener('change', validateSources);
+      
       li.appendChild(cb);
       li.appendChild(span);
       li.appendChild(handle);
@@ -514,6 +540,7 @@ UPLOAD_TEMPLATE = """<!DOCTYPE html>
     });
     
     container.style.display = 'block';
+    validateSources();
   }
   
   function getDragAfterElement(container, y) {
