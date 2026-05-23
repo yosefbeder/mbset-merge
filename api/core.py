@@ -296,12 +296,9 @@ def apply_decisions(df, auto_groups, review_decisions, pmap):
 # ─── Output Packaging ─────────────────────────────────────────────────────────
 
 def build_output(orig_len, final_df, removed_ids):
-    """Package the final DataFrame into a ZIP and build the removed-IDs string."""
+    """Package the final DataFrame into base64 and build the removed-IDs string."""
     buf = io.BytesIO()
     final_df.to_excel(buf, index=False)
-    zb = io.BytesIO()
-    with zipfile.ZipFile(zb, 'w', zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr('merged_output.xlsx', buf.getvalue())
-    z64 = base64.b64encode(zb.getvalue()).decode()
+    file_b64 = base64.b64encode(buf.getvalue()).decode()
     rem_str = '\n'.join(removed_ids) if removed_ids else 'No IDs recorded.'
-    return z64, rem_str
+    return file_b64, rem_str

@@ -1288,11 +1288,11 @@ RESULTS_TEMPLATE = """<!DOCTYPE html>
     </div>
   </div>
 
-  <button class="btn btn-success download-btn" onclick="downloadZip('{{ zip_b64 }}', 'merged_output.zip')">
+  <button class="btn btn-success download-btn" onclick="downloadExcel('{{ excel_b64 }}', 'merged_output.xlsx')">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
       <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
     </svg>
-    Download Merged Excel (.zip)
+    Download Merged Excel (.xlsx)
   </button>
 </div>
 
@@ -1428,11 +1428,11 @@ RESULTS_TEMPLATE = """<!DOCTYPE html>
     });
   }
 
-  function downloadZip(b64, filename) {
+  function downloadExcel(b64, filename) {
     const bytes = atob(b64);
     const arr   = new Uint8Array(bytes.length);
     for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-    const blob = new Blob([arr], { type: 'application/zip' });
+    const blob = new Blob([arr], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const a    = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename;

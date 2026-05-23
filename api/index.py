@@ -70,10 +70,10 @@ def process():
     # No conflicts — auto-merge everything and show results
     if not conflict_groups:
         final_df, rem_ids, rich_report = apply_decisions(df, auto_groups, [], pmap)
-        z64, rem_str = build_output(orig_len, final_df, rem_ids)
+        excel_b64, rem_str = build_output(orig_len, final_df, rem_ids)
         return render_template_string(
             RESULTS_TEMPLATE,
-            zip_b64=z64, removed_str=rem_str, rich_report=rich_report,
+            excel_b64=excel_b64, removed_str=rem_str, rich_report=rich_report,
             orig_len=orig_len, final_len=len(final_df),
             merged_count=len(auto_groups), conflict_count=0,
         )
@@ -132,11 +132,11 @@ def finalize():
                 pass
 
     final_df, rem_ids, rich_report = apply_decisions(df, auto_groups, review_decisions, pmap)
-    z64, rem_str = build_output(orig_len, final_df, rem_ids)
+    excel_b64, rem_str = build_output(orig_len, final_df, rem_ids)
 
     return render_template_string(
         RESULTS_TEMPLATE,
-        zip_b64=z64, removed_str=rem_str, rich_report=rich_report,
+        excel_b64=excel_b64, removed_str=rem_str, rich_report=rich_report,
         orig_len=orig_len, final_len=len(final_df),
         merged_count=len(auto_groups) + len(review_decisions),
         conflict_count=len(conflict_groups),
