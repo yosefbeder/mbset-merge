@@ -1,7 +1,11 @@
-from flask import Flask, request, render_template_string
+from flask import Flask, request, render_template_string, Request
 import base64
 import json
 import pandas as pd
+
+class CustomRequest(Request):
+    # Increase the form memory size limit to 100 MB to accommodate large base64 strings
+    max_form_memory_size = 100 * 1024 * 1024
 
 try:
     from api.core import analyze, apply_decisions, build_output, load_df
@@ -11,7 +15,8 @@ except ImportError:
     from templates import UPLOAD_TEMPLATE, REVIEW_TEMPLATE, RESULTS_TEMPLATE
 
 app = Flask(__name__)
-
+app.request_class = CustomRequest
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB limit
 
 @app.route('/')
 def index():
