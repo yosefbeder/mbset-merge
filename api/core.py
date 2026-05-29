@@ -5,6 +5,7 @@ core.py — Data processing: loading, fuzzy analysis, decision application,
 import zipfile
 import base64
 import io
+import re
 from collections import defaultdict
 
 import pandas as pd
@@ -41,11 +42,20 @@ def get_opts(row, opt_cols):
     return [sv(row[c]) for c in opt_cols if sv(row.get(c))]
 
 
+def clean_opt(text):
+    """Remove common option prefixes like 'A.', 'b-', 'C)' and trailing punctuation for better matching."""
+    s = sv(text)
+    s = re.sub(r'^[a-hA-H][\.\-\)]\s*', '', s).strip()
+    return s.rstrip('. ,;')
+
+
 def opts_fuzzy_match(a, b):
     """True if all sorted option pairs exceed THRESHOLD similarity."""
     if len(a) != len(b):
         return False
-    for x, y in zip(sorted(a, key=str.lower), sorted(b, key=str.lower)):
+    a_clean = [clean_opt(x) for x in a]
+    b_clean = [clean_opt(x) for x in b]
+    for x, y in zip(sorted(a_clean, key=str.lower), sorted(b_clean, key=str.lower)):
         if fuzz.ratio(x.lower(), y.lower()) < THRESHOLD:
             return False
     return True
@@ -140,9 +150,17 @@ def analyze(file_bytes, filename, pmap):
             elif not opts_fuzzy_match(oi, oj):
                 pair_rel[k] = 'options'
             elif has['Correct']:
-                ci = sv(df.iloc[i].get('Correct', '')).lower()
-                cj = sv(df.iloc[j].get('Correct', '')).lower()
-                pair_rel[k] = 'correct' if (ci and cj and ci != cj) else 'auto'
+                ci = sv(df.iloc[i].get('Correct', '')).upper()
+                cj = sv(df.iloc[j].get('Correct', '')).upper()
+                if ci and cj:
+                    val_i = sv(df.iloc[i].get(ci, ci)) if ci in df.columns else ci
+                    val_j = sv(df.iloc[j].get(cj, cj)) if cj in df.columns else cj
+                    if fuzz.ratio(clean_opt(val_i).lower(), clean_opt(val_j).lower()) < THRESHOLD:
+                        pair_rel[k] = 'correct'
+                    else:
+                        pair_rel[k] = 'auto'
+                else:
+                    pair_rel[k] = 'auto'
             else:
                 pair_rel[k] = 'auto'
             union(i, j)
