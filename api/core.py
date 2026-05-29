@@ -45,19 +45,40 @@ def get_opts(row, opt_cols):
 def clean_opt(text):
     """Remove common option prefixes like 'A.', 'b-', 'C)' and trailing punctuation for better matching."""
     s = sv(text)
-    s = re.sub(r'^[a-hA-H][\.\-\)]\s*', '', s).strip()
+    s = re.sub(r'^[a-hA-H]\s*[\.\-\)]\s*', '', s).strip()
     return s.rstrip('. ,;')
 
 
 def opts_fuzzy_match(a, b):
-    """True if all sorted option pairs exceed THRESHOLD similarity."""
+    """True if all option pairs exceed THRESHOLD similarity using greedy matching."""
     if len(a) != len(b):
         return False
-    a_clean = [clean_opt(x) for x in a]
-    b_clean = [clean_opt(x) for x in b]
-    for x, y in zip(sorted(a_clean, key=str.lower), sorted(b_clean, key=str.lower)):
-        if fuzz.ratio(x.lower(), y.lower()) < THRESHOLD:
+    a_clean = [clean_opt(x).lower() for x in a]
+    b_clean = [clean_opt(x).lower() for x in b]
+    
+    matched_a = set()
+    matched_b = set()
+    
+    for _ in range(len(a_clean)):
+        best_ratio = -1
+        best_pair = (-1, -1)
+        for i, x in enumerate(a_clean):
+            if i in matched_a:
+                continue
+            for j, y in enumerate(b_clean):
+                if j in matched_b:
+                    continue
+                r = fuzz.ratio(x, y)
+                if r > best_ratio:
+                    best_ratio = r
+                    best_pair = (i, j)
+        
+        if best_ratio < THRESHOLD:
             return False
+            
+        matched_a.add(best_pair[0])
+        matched_b.add(best_pair[1])
+        
     return True
 
 
