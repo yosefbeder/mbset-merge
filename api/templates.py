@@ -773,6 +773,9 @@ REVIEW_TEMPLATE = """<!DOCTYPE html>
     }
     .info-chip strong { color: var(--text); }
 
+    mark.diff-add { background: rgba(16,185,129,0.25); color: #34d399; border-radius: 3px; padding: 0 2px; }
+    del.diff-del  { background: rgba(239,68,68,0.2); color: #f87171; text-decoration: line-through; border-radius: 3px; padding: 0 2px; }
+
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
@@ -846,6 +849,7 @@ REVIEW_TEMPLATE = """<!DOCTYPE html>
   <input type="hidden" name="conflict_groups_b64" value="{{ conflict_groups_b64 }}">
 </form>
 
+<script src="https://cdn.jsdelivr.net/npm/diff@5.2.0/dist/diff.min.js"></script>
 <script>
   const conflictGroups = {{ conflict_groups | tojson }};
   const LETTERS = ['A','B','C','D','E','F','G','H'];
@@ -883,6 +887,10 @@ REVIEW_TEMPLATE = """<!DOCTYPE html>
       if (isEliminated) cardClass += ' eliminated';
 
       const otherOptSets = group.rows.filter((_, i) => i !== ri).map(r => r.options.map(o => o.toLowerCase()));
+      
+      const otherRowIndex = ri === 0 ? Math.min(1, group.rows.length - 1) : 0;
+      const otherRow = group.rows[otherRowIndex] || group.rows[0];
+      const qTextHtml = getDiffHtml(otherRow.Text, row.Text);
 
       let optsHtml = '';
       if (row.options.length > 0) {
@@ -890,7 +898,8 @@ REVIEW_TEMPLATE = """<!DOCTYPE html>
         row.options.forEach((opt, oi) => {
           const letter  = LETTERS[oi] || String(oi + 1);
           const isExtra = group.type === 'options' && otherOptSets.some(set => !set.some(o => o === opt.toLowerCase()));
-          optsHtml += `<li class="${isExtra ? 'extra-opt' : ''}"><span class="opt-letter">${letter}.</span> ${escHtml(opt)}</li>`;
+          const optDiffHtml = getBestDiffHtml(opt, otherRow.options);
+          optsHtml += `<li class="${isExtra ? 'extra-opt' : ''}"><span class="opt-letter">${letter}.</span> ${optDiffHtml}</li>`;
         });
         optsHtml += '</ul>';
       }
@@ -907,7 +916,7 @@ REVIEW_TEMPLATE = """<!DOCTYPE html>
 
       html += `
         <div class="${cardClass}" id="card-${idx}-${ri}" onclick="selectCandidate(${idx}, ${row.df_index})">
-          <p class="q-text">${escHtml(row.Text)}</p>
+          <p class="q-text">${qTextHtml}</p>
           ${optsHtml}
           ${(row.options.length > 0 || row.Correct || row.Tag || row.Year) ? '<div class="divider"></div>' : ''}
           <div class="meta-row">
@@ -924,6 +933,54 @@ REVIEW_TEMPLATE = """<!DOCTYPE html>
     html += '</div>';
     area.innerHTML = html;
     updateUI();
+  }
+
+  function getDiffHtml(base, current) {
+    if (typeof Diff === 'undefined') return escHtml(current);
+    const diff = Diff.diffWords(base || '', current || '');
+    let html = '';
+    diff.forEach(part => {
+      if (part.added) {
+        html += `<mark class="diff-add">${escHtml(part.value)}</mark>`;
+      } else if (part.removed) {
+        html += `<del class="diff-del">${escHtml(part.value)}</del>`;
+      } else {
+        html += escHtml(part.value);
+      }
+    });
+    return html;
+  }
+
+  function getBestDiffHtml(opt, otherOptions) {
+    if (typeof Diff === 'undefined' || !otherOptions || otherOptions.length === 0) {
+      return getDiffHtml('', opt);
+    }
+    let bestDiff = null;
+    let minChanges = Infinity;
+    
+    otherOptions.forEach(otherOpt => {
+      const diff = Diff.diffWords(otherOpt, opt);
+      let changes = 0;
+      diff.forEach(part => {
+        if (part.added || part.removed) changes += part.value.length;
+      });
+      if (changes < minChanges) {
+        minChanges = changes;
+        bestDiff = diff;
+      }
+    });
+    
+    let html = '';
+    bestDiff.forEach(part => {
+      if (part.added) {
+        html += `<mark class="diff-add">${escHtml(part.value)}</mark>`;
+      } else if (part.removed) {
+        html += `<del class="diff-del">${escHtml(part.value)}</del>`;
+      } else {
+        html += escHtml(part.value);
+      }
+    });
+    return html;
   }
 
   function escHtml(str) {
