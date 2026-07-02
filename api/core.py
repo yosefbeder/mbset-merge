@@ -27,6 +27,11 @@ def load_df(file_bytes, filename):
         return pd.read_csv(io.BytesIO(file_bytes), encoding='latin1')
 
 
+def get_id_col(df):
+    """Return column name if df has an id column (case-insensitive), else None."""
+    return next((c for c in df.columns if str(c).lower() == 'id'), None)
+
+
 def sv(v):
     """Safe string: return stripped str or '' for NA/None."""
     try:
@@ -109,8 +114,11 @@ def _row_data(df, idx, opt_cols, has):
     """Serialize a single DataFrame row into a plain dict for the UI."""
     r = df.iloc[idx]
     yr = r.get('Year') if has['Year'] else None
+    id_val = ''
+    if has['id']:
+        id_val = sv(r.get(has.get('id_col', 'id'), ''))
     return {
-        'id':      (sv(r.get('id', '')) or f'Row {idx + 1}') if has['id'] else f'Row {idx + 1}',
+        'id':      (id_val or f'Row {idx + 1}') if has['id'] else f'Row {idx + 1}',
         'text':    sv(r.get('Text', '')),
         'options': get_opts(r, opt_cols),
         'correct': sv(r.get('Correct', '')) if has['Correct'] else '',
@@ -138,7 +146,10 @@ def analyze(file_bytes, filename, pmap):
         raise ValueError("'Text' column not found in the dataset.")
 
     opt_cols = [c for c in OPTION_COLS_ORDER if c in df.columns]
-    has = {k: k in df.columns for k in ['Correct', 'Tag', 'Year', 'id']}
+    id_col = get_id_col(df)
+    has = {k: k in df.columns for k in ['Correct', 'Tag', 'Year']}
+    has['id'] = id_col is not None
+    has['id_col'] = id_col
     n = len(df)
     texts = df['Text'].fillna('').astype(str).str.lower().tolist()
 
@@ -220,7 +231,7 @@ def analyze(file_bytes, filename, pmap):
                 'Correct': sv(r.get('Correct', '')) if has['Correct'] else '',
                 'Tag':     sv(r.get('Tag', ''))     if has['Tag']     else '',
                 'Year':    str(int(yr)) if yr is not None and not pd.isna(yr) else '',
-                'id':      (sv(r.get('id', '')) or f'Row {idx + 1}') if has['id'] else f'Row {idx + 1}',
+                'id':      (sv(r.get(has.get('id_col', 'id'), '')) or f'Row {idx + 1}') if has['id'] else f'Row {idx + 1}',
             })
 
         if ct:
@@ -268,7 +279,10 @@ def apply_decisions(df, auto_groups, review_decisions, pmap):
         rich_report:  list of {kept, removed} dicts for the interactive UI
     """
     opt_cols = [c for c in OPTION_COLS_ORDER if c in df.columns]
-    has = {k: k in df.columns for k in ['Tag', 'Year', 'id', 'Correct']}
+    id_col = get_id_col(df)
+    has = {k: k in df.columns for k in ['Tag', 'Year', 'Correct']}
+    has['id'] = id_col is not None
+    has['id_col'] = id_col
     to_remove = set()
     removed_ids = []
     rich_report = []
@@ -311,7 +325,7 @@ def apply_decisions(df, auto_groups, review_decisions, pmap):
             if idx != winner:
                 to_remove.add(idx)
                 if has['id']:
-                    v = sv(df.iloc[idx].get('id', ''))
+                    v = sv(df.iloc[idx].get(has.get('id_col', 'id'), ''))
                     if v:
                         removed_ids.append(v)
                 
@@ -328,7 +342,10 @@ def apply_decisions(df, auto_groups, review_decisions, pmap):
             'removed': removed_rows,
         })
 
-    keep = sorted(updated_indices)
+    if has['id']:
+        keep = sorted(updated_indices)
+    else:
+        keep = [i for i in range(len(df)) if i not in to_remove]
     return df.iloc[keep].copy(), removed_ids, rich_report
 
 

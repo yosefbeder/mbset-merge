@@ -8,10 +8,10 @@ class CustomRequest(Request):
     max_form_memory_size = 100 * 1024 * 1024
 
 try:
-    from api.core import analyze, apply_decisions, build_output, load_df
+    from api.core import analyze, apply_decisions, build_output, load_df, get_id_col
     from api.templates import UPLOAD_TEMPLATE, REVIEW_TEMPLATE, RESULTS_TEMPLATE
 except ImportError:
-    from core import analyze, apply_decisions, build_output, load_df
+    from core import analyze, apply_decisions, build_output, load_df, get_id_col
     from templates import UPLOAD_TEMPLATE, REVIEW_TEMPLATE, RESULTS_TEMPLATE
 
 app = Flask(__name__)
@@ -71,6 +71,7 @@ def process():
         return render_template_string(UPLOAD_TEMPLATE, error=str(e))
 
     orig_len = len(df)
+    has_id = get_id_col(df) is not None
 
     # No conflicts — auto-merge everything and show results
     if not conflict_groups:
@@ -81,6 +82,7 @@ def process():
             excel_b64=excel_b64, removed_str=rem_str, rich_report=rich_report,
             orig_len=orig_len, final_len=len(final_df),
             merged_count=len(auto_groups), conflict_count=0,
+            has_id=has_id,
         )
 
     # Conflicts found — serve interactive review page
@@ -122,6 +124,7 @@ def finalize():
         df['Year'] = pd.to_numeric(df['Year'], errors='coerce')
 
     orig_len = len(df)
+    has_id = get_id_col(df) is not None
 
     # Parse manual decisions (one per conflict group)
     review_decisions = []
@@ -145,6 +148,7 @@ def finalize():
         orig_len=orig_len, final_len=len(final_df),
         merged_count=len(auto_groups) + len(review_decisions),
         conflict_count=len(conflict_groups),
+        has_id=has_id,
     )
 
 

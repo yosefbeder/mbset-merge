@@ -1340,6 +1340,7 @@ RESULTS_TEMPLATE = """<!DOCTYPE html>
   </div>
 
   <!-- Removed IDs -->
+  {% if has_id %}
   <div class="section open" id="sec-ids">
     <div class="section-head" onclick="toggleSection('sec-ids')">
       <div class="section-title">
@@ -1355,6 +1356,7 @@ RESULTS_TEMPLATE = """<!DOCTYPE html>
       <pre id="removed-pre">{{ removed_str }}</pre>
     </div>
   </div>
+  {% endif %}
 
   <!-- Interactive Merge Report -->
   <div class="section open" id="sec-report">
